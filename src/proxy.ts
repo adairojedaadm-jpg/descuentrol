@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  // Proteger tanto el panel administrativo visual como los API routes de administración
   if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
     const authHeader = request.headers.get('authorization')
     const adminPassword = process.env.ADMIN_PASSWORD
@@ -11,7 +10,6 @@ export function middleware(request: NextRequest) {
       return new NextResponse('Servidor no configurado correctamente.', { status: 503 })
     }
 
-    // btoa es una API web estándar compatible con Next.js Edge Runtime (a diferencia de Buffer)
     const validAuth = 'Basic ' + btoa(`admin:${adminPassword}`)
 
     if (authHeader !== validAuth) {
