@@ -23,7 +23,7 @@ jobs:
       - name: Install Playwright browsers
         run: cd scrapers && npx playwright install --with-deps chromium
       - name: Run single scraper
-        run: cd scrapers && pnpm start --bank=${{ inputs.bank_slug }}
+        run: cd scrapers && pnpm --ignore-workspace start -- --bank=${{ inputs.bank_slug }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
