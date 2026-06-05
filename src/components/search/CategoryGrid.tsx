@@ -12,7 +12,7 @@ export interface Category {
   color?: string | null
 }
 
-const defaultCategories: Category[] = [
+export const defaultCategories: Category[] = [
   { id: '1', name: 'Combustible', slug: 'combustible', icon: 'Fuel', color: 'from-orange-500/10 to-orange-500/5 hover:border-orange-500/50 hover:shadow-orange-500/5' },
   { id: '2', name: 'Farmacia', slug: 'farmacia', icon: 'Pill', color: 'from-purple-500/10 to-purple-500/5 hover:border-purple-500/50 hover:shadow-purple-500/5' },
   { id: '3', name: 'Supermercado', slug: 'supermercado', icon: 'ShoppingCart', color: 'from-green-500/10 to-green-500/5 hover:border-green-500/50 hover:shadow-green-500/5' },

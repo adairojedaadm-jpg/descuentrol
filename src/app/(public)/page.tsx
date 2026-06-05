@@ -24,7 +24,7 @@ export default function Home() {
       </section>
 
       {/* How it works Section */}
-      <section className="border-t border-border/40 pt-16 mb-8">
+      <section id="como-funciona" className="border-t border-border/40 pt-16 mb-8">
         <h3 className="font-heading text-2xl font-bold tracking-tight text-center text-foreground mb-12">
           Cómo funciona Descuentrol
         </h3>

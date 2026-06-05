@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { Sparkles, CreditCard, ShieldAlert } from 'lucide-react'
+import { Sparkles, CreditCard } from 'lucide-react'
 
 export default function Navbar() {
   return (
@@ -19,28 +19,19 @@ export default function Navbar() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-6">
-          <Link 
-            href="/" 
+          <Link
+            href="/"
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200"
           >
             Inicio
           </Link>
-          <Link 
-            href="/sobre-nosotros" 
+          <Link
+            href="/#como-funciona"
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200"
           >
             Cómo funciona
           </Link>
         </nav>
-
-        <div className="flex items-center gap-4">
-          <Link
-            href="/admin"
-            className="inline-flex h-9 items-center justify-center rounded-lg border border-border/60 px-4 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
-          >
-            Panel Admin
-          </Link>
-        </div>
       </div>
     </header>
   )

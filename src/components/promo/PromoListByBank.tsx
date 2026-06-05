@@ -4,16 +4,21 @@ import PromoCard, { Promo } from './PromoCard'
 import PdfPromoCard from './PdfPromoCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { Bell, Inbox, Info, Building2 } from 'lucide-react'
-import type { BankBenefits } from '@/app/api/beneficios/route'
+import { Bell, Inbox, Building2, Star } from 'lucide-react'
 
-interface PromoListByBankProps {
-  banks: BankBenefits[]
-  isLoading: boolean
-  onOpenSubscribe: () => void
+export interface BankGroup {
+  bank: { id: string; name: string; logo_url?: string | null }
+  promotions: Promo[]
 }
 
-export default function PromoListByBank({ banks, isLoading, onOpenSubscribe }: PromoListByBankProps) {
+interface PromoListByBankProps {
+  banks: BankGroup[]
+  isLoading: boolean
+  onOpenSubscribe: () => void
+  recommendedBankId?: string
+}
+
+export default function PromoListByBank({ banks, isLoading, onOpenSubscribe, recommendedBankId }: PromoListByBankProps) {
   if (isLoading) {
     return (
       <div className="space-y-8">
@@ -53,12 +58,13 @@ export default function PromoListByBank({ banks, isLoading, onOpenSubscribe }: P
           <Inbox className="h-7 w-7" />
         </div>
         <h4 className="font-heading text-lg font-bold text-foreground mb-2">
-          Sin beneficios para hoy
+          Sin beneficios para este día
         </h4>
         <p className="text-xs sm:text-sm text-muted-foreground max-w-sm mb-6 leading-relaxed">
           No encontramos promociones activas para las tarjetas seleccionadas en este día. Intentá cambiar el día o seleccionar más tarjetas.
         </p>
         <Button
+          type="button"
           variant="outline"
           onClick={onOpenSubscribe}
           className="rounded-xl px-5 border-border/60 hover:bg-muted/50 font-semibold gap-1.5"
@@ -72,30 +78,40 @@ export default function PromoListByBank({ banks, isLoading, onOpenSubscribe }: P
 
   return (
     <div className="space-y-10">
-      {banks.map(({ bank, promotions }) => (
-        <section key={bank.id}>
-          {/* Encabezado del banco */}
-          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-border/30">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-background border border-border/50 font-heading text-xs font-black text-muted-foreground shadow-sm shrink-0">
-              {bank.name.substring(0, 2).toUpperCase()}
-            </div>
-            <h3 className="font-heading text-base font-bold text-foreground">{bank.name}</h3>
-            <span className="ml-auto text-3xs font-semibold text-muted-foreground bg-muted/50 border border-border/30 px-2 py-0.5 rounded-full shrink-0">
-              {promotions.length} beneficio{promotions.length !== 1 ? 's' : ''}
-            </span>
-          </div>
+      {banks.map(({ bank, promotions }) => {
+        const isRecommended = recommendedBankId === bank.id
+        return (
+          <section key={bank.id}>
+            {/* Encabezado del banco */}
+            <div className={`flex items-center gap-3 mb-4 pb-3 border-b ${isRecommended ? 'border-primary/40' : 'border-border/30'}`}>
+              <div className={`flex h-9 w-9 items-center justify-center rounded-xl border font-heading text-xs font-black shadow-sm shrink-0 ${isRecommended ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-background border-border/50 text-muted-foreground'}`}>
+                {bank.name.substring(0, 2).toUpperCase()}
+              </div>
+              <h3 className="font-heading text-base font-bold text-foreground">{bank.name}</h3>
 
-          {/* Promos del banco */}
-          <div className="space-y-4">
-            {promotions.map((promo) => {
-              const promoTyped = promo as unknown as Promo
-              return promo.source_type === 'PDF'
-                ? <PdfPromoCard key={promo.id} promo={promoTyped} />
-                : <PromoCard key={promo.id} promo={promoTyped} />
-            })}
-          </div>
-        </section>
-      ))}
+              {isRecommended && (
+                <span className="flex items-center gap-1 text-3xs font-bold text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-full">
+                  <Star className="h-2.5 w-2.5 fill-primary" />
+                  Opción Recomendada
+                </span>
+              )}
+
+              <span className="ml-auto text-3xs font-semibold text-muted-foreground bg-muted/50 border border-border/30 px-2 py-0.5 rounded-full shrink-0">
+                {promotions.length} beneficio{promotions.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {/* Promos del banco */}
+            <div className="space-y-4">
+              {promotions.map((promo) =>
+                promo.source_type === 'PDF'
+                  ? <PdfPromoCard key={promo.id} promo={promo} />
+                  : <PromoCard key={promo.id} promo={promo} />
+              )}
+            </div>
+          </section>
+        )
+      })}
 
       {/* Resumen final */}
       <div className="flex items-center gap-2 text-3xs text-muted-foreground py-3 border-t border-border/20">
