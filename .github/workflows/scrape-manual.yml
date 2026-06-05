@@ -1,0 +1,31 @@
+name: Manual Scraping (Single Bank)
+
+on:
+  workflow_dispatch:
+    inputs:
+      bank_slug:
+        description: 'Banco a scrapear (ej: itau, continental, ueno, gnb, familiar, sudameris)'
+        required: true
+        type: string
+
+jobs:
+  scrape-single:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install pnpm
+        run: npm install -g pnpm
+      - name: Install dependencies
+        run: cd scrapers && pnpm install --ignore-workspace
+      - name: Install Playwright browsers
+        run: cd scrapers && npx playwright install --with-deps chromium
+      - name: Run single scraper
+        run: cd scrapers && pnpm start --bank=${{ inputs.bank_slug }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}

@@ -1,0 +1,24 @@
+{
+  "name": "descuentrol-scrapers",
+  "version": "1.0.0",
+  "description": "Scrapers for Paraguay credit card promotions",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.8",
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.4.5",
+    "pdf-parse": "^1.1.1",
+    "playwright": "^1.42.1",
+    "resend": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/pdf-parse": "^1.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

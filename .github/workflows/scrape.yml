@@ -1,0 +1,29 @@
+name: Weekly Scraping
+
+on:
+  schedule:
+    - cron: '0 5 * * 0'   # Domingos 05:00 UTC (02:00 AM PY)
+  workflow_dispatch:      # Trigger manual desde GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install pnpm
+        run: npm install -g pnpm
+      - name: Install dependencies
+        run: cd scrapers && pnpm install --ignore-workspace
+      - name: Install Playwright browsers
+        run: cd scrapers && npx playwright install --with-deps chromium
+      - name: Run scrapers
+        run: cd scrapers && pnpm start
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
