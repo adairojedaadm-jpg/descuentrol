@@ -10,20 +10,22 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
-import { 
-  BarChart3, 
-  CreditCard, 
-  Users, 
-  CheckCircle2, 
-  RefreshCw, 
-  Trash2, 
-  AlertTriangle, 
-  Activity, 
-  Search, 
+import {
+  BarChart3,
+  CreditCard,
+  Users,
+  Trash2,
+  AlertTriangle,
+  Activity,
+  Search,
   Play,
   Clock,
-  ExternalLink
+  FileUp,
+  CheckCircle2,
+  Loader2,
+  RotateCcw
 } from 'lucide-react'
+import type { ExtractedPromo } from '@/app/api/admin/upload-pdf/route'
 
 // Interfaces
 interface Stats {
@@ -69,6 +71,288 @@ interface ScrapingLogAdmin {
   bank_name: string
 }
 
+// ─── Tab PDF Upload ────────────────────────────────────────────────────────────
+type PdfUploadState = 'select' | 'loading' | 'preview' | 'saving' | 'done' | 'error'
+
+function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
+  const [state, setState] = useState<PdfUploadState>('select')
+  const [selectedBankId, setSelectedBankId] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [extracted, setExtracted] = useState<ExtractedPromo[]>([])
+  const [included, setIncluded] = useState<boolean[]>([])
+  const [errorMsg, setErrorMsg] = useState('')
+  const [savedCount, setSavedCount] = useState(0)
+
+  const selectedBankName = banks.find(b => b.id === selectedBankId)?.name ?? ''
+
+  const handleAnalyze = async () => {
+    if (!file || !selectedBankId) return
+    setState('loading')
+    setErrorMsg('')
+    try {
+      const form = new FormData()
+      form.append('pdf', file)
+      form.append('bank_id', selectedBankId)
+      const res = await fetch('/api/admin/upload-pdf', { method: 'POST', body: form })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error al analizar el PDF')
+      const promos: ExtractedPromo[] = json.promotions
+      setExtracted(promos)
+      setIncluded(promos.map(() => true))
+      setState('preview')
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Error desconocido')
+      setState('error')
+    }
+  }
+
+  const handleSave = async () => {
+    const toSave = extracted.filter((_, i) => included[i])
+    if (toSave.length === 0) return
+    setState('saving')
+    try {
+      const res = await fetch('/api/admin/guardar-promociones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bank_id: selectedBankId, promotions: toSave }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error al guardar')
+      setSavedCount(json.saved)
+      setState('done')
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Error desconocido')
+      setState('error')
+    }
+  }
+
+  const reset = () => {
+    setState('select')
+    setFile(null)
+    setExtracted([])
+    setIncluded([])
+    setErrorMsg('')
+    setSavedCount(0)
+  }
+
+  const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
+  if (state === 'done') {
+    return (
+      <Card className="border-border/50 shadow-2sm rounded-2xl overflow-hidden">
+        <CardContent className="p-10 flex flex-col items-center text-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600 border border-green-200">
+            <CheckCircle2 className="h-7 w-7" />
+          </div>
+          <h3 className="font-heading text-lg font-bold text-foreground">
+            {savedCount} promociones guardadas
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Las promos de <strong>{selectedBankName}</strong> ya están visibles en la pestaña Promociones y en la web pública.
+          </p>
+          <Button type="button" onClick={reset} className="mt-2 rounded-xl gap-1.5">
+            <RotateCcw className="h-3.5 w-3.5" />
+            Cargar otro PDF
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (state === 'error') {
+    return (
+      <Card className="border-destructive/40 shadow-2sm rounded-2xl overflow-hidden">
+        <CardContent className="p-8 flex flex-col items-center text-center gap-3">
+          <AlertTriangle className="h-8 w-8 text-destructive" />
+          <p className="text-sm font-semibold text-destructive">Ocurrió un error</p>
+          <p className="text-xs text-muted-foreground max-w-md">{errorMsg}</p>
+          <Button type="button" variant="outline" onClick={reset} className="mt-2 rounded-xl">
+            Intentar de nuevo
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* PASO 1: Selección */}
+      <Card className="border-border/50 shadow-2sm rounded-2xl overflow-hidden">
+        <CardHeader className="bg-muted/10 border-b border-border/20">
+          <CardTitle className="font-heading text-base font-bold text-foreground flex items-center gap-2">
+            <FileUp className="h-4 w-4 text-primary" />
+            Cargar PDF de Beneficios con IA
+          </CardTitle>
+          <CardDescription className="text-3xs">
+            Subí el PDF de beneficios de un banco. Claude AI extrae automáticamente todas las promociones.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 space-y-5">
+          {/* Selector banco */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">1. Seleccioná el banco</label>
+            <select
+              title="Seleccioná el banco"
+              value={selectedBankId}
+              onChange={e => setSelectedBankId(e.target.value)}
+              disabled={state === 'loading' || state === 'preview' || state === 'saving'}
+              className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+            >
+              <option value="">-- Elegir banco --</option>
+              {banks.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Input PDF */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">2. Seleccioná el archivo PDF</label>
+            <div className="relative">
+              <input
+                type="file"
+                title="Seleccioná un archivo PDF"
+                accept=".pdf,application/pdf"
+                disabled={state === 'loading' || state === 'preview' || state === 'saving'}
+                onChange={e => setFile(e.target.files?.[0] ?? null)}
+                className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/20 cursor-pointer disabled:opacity-50"
+              />
+            </div>
+            {file && (
+              <p className="text-3xs text-muted-foreground">
+                Archivo: <span className="font-semibold text-foreground">{file.name}</span> ({(file.size / 1024).toFixed(0)} KB)
+              </p>
+            )}
+          </div>
+
+          {/* Botón analizar */}
+          {state !== 'preview' && (
+            <Button
+              type="button"
+              onClick={handleAnalyze}
+              disabled={!file || !selectedBankId || state === 'loading'}
+              className="w-full rounded-xl font-semibold gap-2 h-11"
+            >
+              {state === 'loading' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Analizando con IA... (puede tardar unos segundos)
+                </>
+              ) : (
+                <>
+                  <FileUp className="h-4 w-4" />
+                  Analizar PDF con IA
+                </>
+              )}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* PASO 2: Preview */}
+      {(state === 'preview' || state === 'saving') && extracted.length > 0 && (
+        <Card className="border-border/50 shadow-2sm rounded-2xl overflow-hidden">
+          <CardHeader className="bg-muted/10 border-b border-border/20 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="font-heading text-base font-bold text-foreground">
+                {extracted.length} promociones extraídas — {selectedBankName}
+              </CardTitle>
+              <CardDescription className="text-3xs">
+                Desmarcar las que no querés guardar. El resto se insertará en la base de datos.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground">
+                {included.filter(Boolean).length} seleccionadas
+              </span>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={included.filter(Boolean).length === 0 || state === 'saving'}
+                className="rounded-xl font-semibold gap-1.5"
+              >
+                {state === 'saving' ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
+                ) : (
+                  <><CheckCircle2 className="h-4 w-4" />Guardar {included.filter(Boolean).length}</>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/20">
+                <TableRow>
+                  <TableHead className="w-10 text-center">
+                    <input
+                      type="checkbox"
+                      title="Seleccionar todas"
+                      checked={included.every(Boolean)}
+                      onChange={e => setIncluded(included.map(() => e.target.checked))}
+                      className="rounded"
+                    />
+                  </TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Título</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Descuento</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Días</TableHead>
+                  <TableHead className="text-xs font-bold text-foreground">Categorías</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {extracted.map((promo, i) => (
+                  <TableRow key={i} className={included[i] ? '' : 'opacity-40'}>
+                    <TableCell className="text-center">
+                      <input
+                        type="checkbox"
+                        title="Incluir esta promoción"
+                        checked={included[i]}
+                        onChange={e => {
+                          const next = [...included]
+                          next[i] = e.target.checked
+                          setIncluded(next)
+                        }}
+                        className="rounded"
+                      />
+                    </TableCell>
+                    <TableCell className="text-xs max-w-xs">
+                      <div className="font-semibold text-foreground truncate" title={promo.title}>{promo.title}</div>
+                      {promo.conditions && (
+                        <div className="text-4xs text-muted-foreground truncate mt-0.5" title={promo.conditions}>{promo.conditions}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <Badge variant="outline" className="text-3xs font-semibold rounded-full border-secondary/20 bg-secondary/5 text-secondary">
+                        {promo.discount_display}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {promo.days_of_week.length === 0 || promo.days_of_week.length === 7
+                        ? 'Todos'
+                        : promo.days_of_week.map(d => DAYS[d]).join('·')}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {(promo.category_slugs || []).join(', ') || '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {(state === 'preview' || state === 'saving') && extracted.length === 0 && (
+        <Card className="border-border/50 rounded-2xl">
+          <CardContent className="p-8 text-center text-xs text-muted-foreground">
+            La IA no encontró promociones en este PDF. Probá con otro archivo.
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// ─── Dashboard Principal ───────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const queryClient = useQueryClient()
   const [promoFilter, setPromoFilter] = useState('')
@@ -227,6 +511,10 @@ export default function AdminDashboard() {
               <TabsTrigger value="promos" className="rounded-lg font-semibold text-xs cursor-pointer">Promociones ({promos.length})</TabsTrigger>
               <TabsTrigger value="banks" className="rounded-lg font-semibold text-xs cursor-pointer">Bancos ({banks.length})</TabsTrigger>
               <TabsTrigger value="logs" className="rounded-lg font-semibold text-xs cursor-pointer">Logs de Raspado</TabsTrigger>
+              <TabsTrigger value="upload-pdf" className="rounded-lg font-semibold text-xs cursor-pointer flex items-center gap-1">
+                <FileUp className="h-3 w-3" />
+                Cargar PDF
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -475,6 +763,7 @@ export default function AdminDashboard() {
 
           {/* TAB 4: SCRAPING LOGS */}
           <TabsContent value="logs" className="space-y-4 animate-fade-in">
+
             <Card className="border-border/50 shadow-2sm rounded-2xl overflow-hidden">
               <CardHeader className="bg-muted/10 border-b border-border/20">
                 <CardTitle className="font-heading text-base font-bold text-foreground">Historial de Ejecuciones de Scraping</CardTitle>
@@ -533,6 +822,11 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+          {/* TAB 5: CARGAR PDF */}
+          <TabsContent value="upload-pdf" className="animate-fade-in">
+            <PdfUploadTab banks={banks} />
+          </TabsContent>
+
         </Tabs>
       </main>
     </div>
