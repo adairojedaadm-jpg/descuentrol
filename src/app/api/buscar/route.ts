@@ -6,7 +6,7 @@ import type { Promo } from '@/components/promo/PromoCard'
 
 const schema = z.object({
   cat: z.string().min(1).max(50),
-  tarjetas: z.string().optional().transform(s =>
+  tarjetas: z.string().nullish().transform(s =>
     s ? s.split(',').filter(Boolean) : []
   ),
   dia: z.preprocess(
