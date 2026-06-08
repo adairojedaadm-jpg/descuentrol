@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -23,7 +24,8 @@ import {
   FileUp,
   CheckCircle2,
   Loader2,
-  RotateCcw
+  RotateCcw,
+  LogOut
 } from 'lucide-react'
 import type { ExtractedPromo } from '@/app/api/admin/upload-pdf/route'
 
@@ -354,8 +356,14 @@ function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
 
 // ─── Dashboard Principal ───────────────────────────────────────────────────────
 export default function AdminDashboard() {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [promoFilter, setPromoFilter] = useState('')
+
+  async function handleLogout() {
+    await fetch('/api/admin/auth', { method: 'DELETE' })
+    router.replace('/admin/login')
+  }
 
   // 1. Queries
   const { data: statsData, isLoading: isStatsLoading } = useQuery<{ data: Stats }>({
@@ -491,11 +499,22 @@ export default function AdminDashboard() {
               <span className="text-muted-foreground font-light text-sm ml-1">Panel Admin</span>
             </span>
           </div>
-          <Link href="/">
-            <Button variant="outline" size="sm" className="rounded-xl border-border/60 text-xs font-semibold">
-              Ver Web Pública
+          <div className="flex items-center gap-2">
+            <Link href="/">
+              <Button variant="outline" size="sm" className="rounded-xl border-border/60 text-xs font-semibold">
+                Ver Web Pública
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="rounded-xl text-xs font-semibold text-muted-foreground hover:text-destructive gap-1.5"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Cerrar sesión
             </Button>
-          </Link>
+          </div>
         </div>
       </header>
 
