@@ -2,9 +2,52 @@
 
 import PromoCard, { Promo } from './PromoCard'
 import PdfPromoCard from './PdfPromoCard'
+import TieredPromoCard, { baseTieredTitle } from './TieredPromoCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Bell, Inbox, Building2, Star, Zap } from 'lucide-react'
+
+// ─── Lógica de agrupamiento escalonado ────────────────────────────────────────
+
+type GroupedItem =
+  | { kind: 'single'; promo: Promo }
+  | { kind: 'tiered'; promos: Promo[] }
+
+function groupKey(promo: Promo): string {
+  const sortedDays = (promo.days_of_week as number[]).slice().sort().join(',')
+  return [
+    promo.discount_type,
+    promo.valid_to ?? '',
+    sortedDays,
+    baseTieredTitle(promo.title),
+  ].join('||')
+}
+
+function groupTieredPromos(promos: Promo[]): GroupedItem[] {
+  const buckets = new Map<string, Promo[]>()
+  for (const promo of promos) {
+    const key = groupKey(promo)
+    if (!buckets.has(key)) buckets.set(key, [])
+    buckets.get(key)!.push(promo)
+  }
+
+  const result: GroupedItem[] = []
+  for (const group of buckets.values()) {
+    if (group.length === 1) {
+      result.push({ kind: 'single', promo: group[0] })
+      continue
+    }
+    const uniqueValues = new Set(group.map(p => p.discount_value).filter(v => v !== null))
+    if (uniqueValues.size > 1) {
+      const sorted = [...group].sort((a, b) => (b.discount_value ?? 0) - (a.discount_value ?? 0))
+      result.push({ kind: 'tiered', promos: sorted })
+    } else {
+      // Mismo valor en todos: mostrar solo la primera (duplicado)
+      result.push({ kind: 'single', promo: group[0] })
+    }
+  }
+  return result
+}
 
 export interface BankGroup {
   bank: { id: string; name: string; logo_url?: string | null; is_sponsored?: boolean }
@@ -83,6 +126,9 @@ export default function PromoListByBank({ banks, isLoading, onOpenSubscribe, rec
         const isRecommended = recommendedBankId === bank.id
         const isSponsored = sponsoredBankId === bank.id
 
+        const grouped = groupTieredPromos(promotions)
+        const displayCount = grouped.length
+
         return (
           <div key={bank.id}>
             <section className={isSponsored ? 'rounded-2xl border border-amber-200 bg-amber-50/30 p-4 -mx-4' : ''}>
@@ -112,17 +158,20 @@ export default function PromoListByBank({ banks, isLoading, onOpenSubscribe, rec
                 )}
 
                 <span className="ml-auto text-3xs font-semibold text-muted-foreground bg-muted/50 border border-border/30 px-2 py-0.5 rounded-full shrink-0">
-                  {promotions.length} beneficio{promotions.length !== 1 ? 's' : ''}
+                  {displayCount} beneficio{displayCount !== 1 ? 's' : ''}
                 </span>
               </div>
 
-              {/* Promos del banco */}
+              {/* Promos del banco (agrupadas si son escalonadas) */}
               <div className="space-y-4">
-                {promotions.map((promo) =>
-                  promo.source_type === 'PDF'
-                    ? <PdfPromoCard key={promo.id} promo={promo} />
-                    : <PromoCard key={promo.id} promo={promo} />
-                )}
+                {grouped.map((item, i) => {
+                  if (item.kind === 'tiered') {
+                    return <TieredPromoCard key={`tiered-${i}`} promos={item.promos} />
+                  }
+                  return item.promo.source_type === 'PDF'
+                    ? <PdfPromoCard key={item.promo.id} promo={item.promo} />
+                    : <PromoCard key={item.promo.id} promo={item.promo} />
+                })}
               </div>
             </section>
           </div>
