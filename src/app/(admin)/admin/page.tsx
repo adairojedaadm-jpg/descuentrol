@@ -76,36 +76,52 @@ interface ScrapingLogAdmin {
 // ─── Tab PDF Upload ────────────────────────────────────────────────────────────
 type PdfUploadState = 'select' | 'loading' | 'preview' | 'saving' | 'done' | 'error'
 
+interface FileError { name: string; error: string }
+interface Progress { current: number; total: number; currentName: string }
+
 function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
   const [state, setState] = useState<PdfUploadState>('select')
   const [selectedBankId, setSelectedBankId] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [extracted, setExtracted] = useState<ExtractedPromo[]>([])
   const [included, setIncluded] = useState<boolean[]>([])
   const [errorMsg, setErrorMsg] = useState('')
+  const [fileErrors, setFileErrors] = useState<FileError[]>([])
+  const [progress, setProgress] = useState<Progress>({ current: 0, total: 0, currentName: '' })
   const [savedCount, setSavedCount] = useState(0)
 
   const selectedBankName = banks.find(b => b.id === selectedBankId)?.name ?? ''
+  const isLocked = state === 'loading' || state === 'preview' || state === 'saving'
 
   const handleAnalyze = async () => {
-    if (!file || !selectedBankId) return
+    if (files.length === 0 || !selectedBankId) return
     setState('loading')
     setErrorMsg('')
-    try {
-      const form = new FormData()
-      form.append('pdf', file)
-      form.append('bank_id', selectedBankId)
-      const res = await fetch('/api/admin/upload-pdf', { method: 'POST', body: form })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Error al analizar el PDF')
-      const promos: ExtractedPromo[] = json.promotions
-      setExtracted(promos)
-      setIncluded(promos.map(() => true))
-      setState('preview')
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Error desconocido')
-      setState('error')
+    setFileErrors([])
+
+    const allPromos: ExtractedPromo[] = []
+    const errors: FileError[] = []
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      setProgress({ current: i + 1, total: files.length, currentName: file.name })
+      try {
+        const form = new FormData()
+        form.append('pdf', file)
+        form.append('bank_id', selectedBankId)
+        const res = await fetch('/api/admin/upload-pdf', { method: 'POST', body: form })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Error al analizar')
+        allPromos.push(...(json.promotions as ExtractedPromo[]))
+      } catch (err) {
+        errors.push({ name: file.name, error: err instanceof Error ? err.message : 'Error desconocido' })
+      }
     }
+
+    setFileErrors(errors)
+    setExtracted(allPromos)
+    setIncluded(allPromos.map(() => true))
+    setState('preview')
   }
 
   const handleSave = async () => {
@@ -130,10 +146,12 @@ function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
 
   const reset = () => {
     setState('select')
-    setFile(null)
+    setFiles([])
     setExtracted([])
     setIncluded([])
     setErrorMsg('')
+    setFileErrors([])
+    setProgress({ current: 0, total: 0, currentName: '' })
     setSavedCount(0)
   }
 
@@ -154,7 +172,7 @@ function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
           </p>
           <Button type="button" onClick={reset} className="mt-2 rounded-xl gap-1.5">
             <RotateCcw className="h-3.5 w-3.5" />
-            Cargar otro PDF
+            Cargar más PDFs
           </Button>
         </CardContent>
       </Card>
@@ -183,13 +201,14 @@ function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
         <CardHeader className="bg-muted/10 border-b border-border/20">
           <CardTitle className="font-heading text-base font-bold text-foreground flex items-center gap-2">
             <FileUp className="h-4 w-4 text-primary" />
-            Cargar PDF de Beneficios con IA
+            Cargar PDFs de Beneficios con IA
           </CardTitle>
           <CardDescription className="text-3xs">
-            Subí el PDF de beneficios de un banco. Claude AI extrae automáticamente todas las promociones.
+            Seleccioná uno o varios PDFs del mismo banco. La IA los procesa en secuencia y junta todas las promociones.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 space-y-5">
+
           {/* Selector banco */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground">1. Seleccioná el banco</label>
@@ -197,7 +216,7 @@ function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
               title="Seleccioná el banco"
               value={selectedBankId}
               onChange={e => setSelectedBankId(e.target.value)}
-              disabled={state === 'loading' || state === 'preview' || state === 'saving'}
+              disabled={isLocked}
               className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
             >
               <option value="">-- Elegir banco --</option>
@@ -207,49 +226,92 @@ function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
             </select>
           </div>
 
-          {/* Input PDF */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground">2. Seleccioná el archivo PDF</label>
-            <div className="relative">
-              <input
-                type="file"
-                title="Seleccioná un archivo PDF"
-                accept=".pdf,application/pdf"
-                disabled={state === 'loading' || state === 'preview' || state === 'saving'}
-                onChange={e => setFile(e.target.files?.[0] ?? null)}
-                className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/20 cursor-pointer disabled:opacity-50"
-              />
-            </div>
-            {file && (
-              <p className="text-3xs text-muted-foreground">
-                Archivo: <span className="font-semibold text-foreground">{file.name}</span> ({(file.size / 1024).toFixed(0)} KB)
-              </p>
+          {/* Input PDFs (múltiple) */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-foreground">
+              2. Seleccioná los archivos PDF
+            </label>
+            <input
+              type="file"
+              title="Seleccioná uno o varios PDFs"
+              accept=".pdf,application/pdf"
+              multiple
+              disabled={isLocked}
+              onChange={e => setFiles(Array.from(e.target.files ?? []))}
+              className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/20 cursor-pointer disabled:opacity-50"
+            />
+            <p className="text-3xs text-muted-foreground">
+              Podés seleccionar varios archivos a la vez manteniendo <kbd className="bg-muted px-1 rounded text-foreground font-mono">Ctrl</kbd> (o <kbd className="bg-muted px-1 rounded text-foreground font-mono">⌘</kbd> en Mac) al hacer clic.
+            </p>
+
+            {/* Lista de archivos seleccionados */}
+            {files.length > 0 && (
+              <div className="mt-2 rounded-xl border border-border/40 bg-muted/20 divide-y divide-border/20 overflow-hidden">
+                {files.map((f, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2">
+                    <span className="text-xs font-medium text-foreground truncate max-w-xs">{f.name}</span>
+                    <span className="text-3xs text-muted-foreground ml-2 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                  </div>
+                ))}
+                <div className="px-3 py-1.5 bg-muted/30 text-3xs text-muted-foreground font-semibold">
+                  {files.length} archivo{files.length !== 1 ? 's' : ''} seleccionado{files.length !== 1 ? 's' : ''}
+                </div>
+              </div>
             )}
           </div>
 
+          {/* Progreso durante el análisis */}
+          {state === 'loading' && (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                  Analizando archivo {progress.current} de {progress.total}
+                </span>
+                <span className="text-primary">{Math.round((progress.current / progress.total) * 100)}%</span>
+              </div>
+              <div className="w-full bg-border/40 rounded-full h-1.5">
+                {/* eslint-disable-next-line react/forbid-dom-props */}
+                <div
+                  className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                />
+              </div>
+              <p className="text-3xs text-muted-foreground truncate">{progress.currentName}</p>
+            </div>
+          )}
+
           {/* Botón analizar */}
-          {state !== 'preview' && (
+          {state !== 'preview' && state !== 'loading' && (
             <Button
               type="button"
               onClick={handleAnalyze}
-              disabled={!file || !selectedBankId || state === 'loading'}
+              disabled={files.length === 0 || !selectedBankId}
               className="w-full rounded-xl font-semibold gap-2 h-11"
             >
-              {state === 'loading' ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Analizando con IA... (puede tardar unos segundos)
-                </>
-              ) : (
-                <>
-                  <FileUp className="h-4 w-4" />
-                  Analizar PDF con IA
-                </>
-              )}
+              <FileUp className="h-4 w-4" />
+              Analizar {files.length > 1 ? `${files.length} PDFs` : 'PDF'} con IA
             </Button>
           )}
         </CardContent>
       </Card>
+
+      {/* Errores por archivo */}
+      {state === 'preview' && fileErrors.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/50 rounded-2xl overflow-hidden">
+          <CardContent className="p-4 space-y-2">
+            <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {fileErrors.length} archivo{fileErrors.length !== 1 ? 's' : ''} no pudo{fileErrors.length !== 1 ? 'ron' : ''} procesarse
+            </p>
+            {fileErrors.map((fe, i) => (
+              <div key={i} className="text-3xs text-amber-600">
+                <span className="font-semibold">{fe.name}:</span> {fe.error}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* PASO 2: Preview */}
       {(state === 'preview' || state === 'saving') && extracted.length > 0 && (
@@ -343,10 +405,10 @@ function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
         </Card>
       )}
 
-      {(state === 'preview' || state === 'saving') && extracted.length === 0 && (
+      {state === 'preview' && extracted.length === 0 && fileErrors.length === 0 && (
         <Card className="border-border/50 rounded-2xl">
           <CardContent className="p-8 text-center text-xs text-muted-foreground">
-            La IA no encontró promociones en este PDF. Probá con otro archivo.
+            La IA no encontró promociones en los PDFs. Probá con otros archivos.
           </CardContent>
         </Card>
       )}
