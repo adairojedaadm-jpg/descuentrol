@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, Mail, Lock, UserPlus, CheckCircle2, CreditCard } from 'lucide-react'
 
 export default function RegistroPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -29,7 +31,7 @@ export default function RegistroPage() {
 
     setLoading(true)
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -47,6 +49,14 @@ export default function RegistroPage() {
       return
     }
 
+    // Si hay sesión activa, la confirmación de email está desactivada → redirigir directo
+    if (data.session) {
+      router.push('/')
+      router.refresh()
+      return
+    }
+
+    // Si no hay sesión, Supabase envió un email de confirmación
     setDone(true)
   }
 
