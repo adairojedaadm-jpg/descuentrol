@@ -29,8 +29,8 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/sobre-nosotros" className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150">
-                  Cómo funciona
+                <Link href="/publicidad" className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150">
+                  Anunciá aquí
                 </Link>
               </li>
             </ul>

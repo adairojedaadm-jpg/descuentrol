@@ -24,10 +24,13 @@ export async function GET() {
   }
 }
 
-// PATCH: Cambiar estado activo/inactivo de un banco
+// PATCH: Actualizar campos de un banco (active, is_sponsored)
 const updateBankSchema = z.object({
   id: z.string().uuid(),
-  active: z.boolean(),
+  active: z.boolean().optional(),
+  is_sponsored: z.boolean().optional(),
+}).refine(d => d.active !== undefined || d.is_sponsored !== undefined, {
+  message: 'Se debe proporcionar al menos un campo a actualizar.',
 })
 
 export async function PATCH(request: NextRequest) {
@@ -39,12 +42,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Parámetros inválidos.' }, { status: 400 })
     }
 
-    const { id, active } = validation.data
+    const { id, active, is_sponsored } = validation.data
+    const updates: Database['public']['Tables']['banks']['Update'] = {}
+    if (active !== undefined) updates.active = active
+    if (is_sponsored !== undefined) updates.is_sponsored = is_sponsored
+
     const supabase: SupabaseClient<Database> = await createClient()
 
     const { data, error } = await supabase
       .from('banks')
-      .update({ active } as Database['public']['Tables']['banks']['Update'])
+      .update(updates)
       .eq('id', id)
       .select()
       .single()

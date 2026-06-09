@@ -87,6 +87,7 @@ function SearchUI() {
   const bankGroups = data?.banks || []
   const totalPromos = data?.total || 0
   const recommendedBankId = bankGroups[0]?.bank.id
+  const sponsoredBankId = bankGroups.find(bg => bg.bank.is_sponsored)?.bank.id
 
   const handleCategoryChange = (slug: string) => {
     const params = new URLSearchParams()
@@ -224,6 +225,7 @@ function SearchUI() {
           isLoading={isLoading && isInitialized}
           onOpenSubscribe={() => setIsSubscribeOpen(true)}
           recommendedBankId={recommendedBankId}
+          sponsoredBankId={sponsoredBankId}
         />
       )}
 

@@ -20,6 +20,7 @@ export interface Database {
           scraper_config: Json | null
           last_scraped_at: string | null
           active: boolean
+          is_sponsored: boolean
           created_at: string
           updated_at: string
         }
@@ -33,6 +34,7 @@ export interface Database {
           scraper_config?: Json | null
           last_scraped_at?: string | null
           active?: boolean
+          is_sponsored?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -46,6 +48,7 @@ export interface Database {
           scraper_config?: Json | null
           last_scraped_at?: string | null
           active?: boolean
+          is_sponsored?: boolean
           created_at?: string
           updated_at?: string
         }

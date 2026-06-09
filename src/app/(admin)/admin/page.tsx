@@ -25,7 +25,9 @@ import {
   CheckCircle2,
   Loader2,
   RotateCcw,
-  LogOut
+  LogOut,
+  Megaphone,
+  Zap,
 } from 'lucide-react'
 import type { ExtractedPromo } from '@/app/api/admin/upload-pdf/route'
 
@@ -55,6 +57,7 @@ interface BankAdmin {
   id: string
   name: string
   active: boolean
+  is_sponsored: boolean
   scraper_type: 'PLAYWRIGHT' | 'CHEERIO'
   last_scraped_at: string | null
 }
@@ -416,6 +419,109 @@ function PdfUploadTab({ banks }: { banks: BankAdmin[] }) {
   )
 }
 
+// ─── Tab Publicidad ────────────────────────────────────────────────────────────
+function PublicidadTab({ banks }: { banks: BankAdmin[] }) {
+  const queryClient = useQueryClient()
+
+  const toggleSponsoredMutation = useMutation({
+    mutationFn: async ({ id, is_sponsored }: { id: string; is_sponsored: boolean }) => {
+      const res = await fetch('/api/admin/bancos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_sponsored }),
+      })
+      if (!res.ok) throw new Error('Error al actualizar banco')
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-banks'] })
+    },
+  })
+
+  const sponsoredBanks = banks.filter(b => b.is_sponsored)
+
+  return (
+    <div className="space-y-6">
+      {/* SQL requerido */}
+      <Card className="border-amber-200/60 rounded-2xl overflow-hidden">
+        <CardHeader className="bg-amber-50/60 border-b border-amber-100">
+          <CardTitle className="font-heading text-sm font-bold text-amber-800 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Paso previo obligatorio
+          </CardTitle>
+          <CardDescription className="text-3xs text-amber-700">
+            Si es la primera vez que usás esta pestaña, ejecutá este SQL en el <strong>SQL Editor</strong> de tu proyecto Supabase. Solo hay que hacerlo una vez.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-5">
+          <code className="block bg-muted rounded-xl border border-border/40 px-4 py-3 font-mono text-xs text-foreground break-all">
+            ALTER TABLE banks ADD COLUMN IF NOT EXISTS is_sponsored BOOLEAN NOT NULL DEFAULT FALSE;
+          </code>
+          <p className="text-3xs text-muted-foreground mt-3">
+            Luego recargá esta página y los toggles funcionarán correctamente.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Control de patrocinadores */}
+      <Card className="border-border/50 shadow-2sm rounded-2xl overflow-hidden">
+        <CardHeader className="bg-muted/10 border-b border-border/20">
+          <CardTitle className="font-heading text-base font-bold text-foreground flex items-center gap-2">
+            <Megaphone className="h-4 w-4 text-primary" />
+            Banco Patrocinado
+          </CardTitle>
+          <CardDescription className="text-3xs">
+            El banco con el toggle activo aparece con el badge dorado &ldquo;Patrocinado&rdquo; y estilo destacado en los resultados de búsqueda.
+            Activá solo uno a la vez para mantener la exclusividad del espacio publicitario.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          {sponsoredBanks.length > 0 ? (
+            <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+              <Zap className="h-3.5 w-3.5 fill-amber-600 shrink-0" />
+              Patrocinado activo: {sponsoredBanks.map(b => b.name).join(', ')}
+            </div>
+          ) : (
+            <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 border border-border/30 rounded-xl px-4 py-2.5">
+              Sin banco patrocinado activo. Activá uno para mostrarlo destacado en los resultados.
+            </div>
+          )}
+
+          <Table>
+            <TableHeader className="bg-muted/20">
+              <TableRow>
+                <TableHead className="text-xs font-bold text-foreground">Banco</TableHead>
+                <TableHead className="text-xs font-bold text-foreground text-center">Patrocinado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {banks.map(bank => (
+                <TableRow key={bank.id} className={bank.is_sponsored ? 'bg-amber-50/40' : 'hover:bg-muted/5'}>
+                  <TableCell className="text-xs font-bold text-foreground">
+                    {bank.name}
+                    {bank.is_sponsored && (
+                      <span className="ml-2 inline-flex items-center gap-1 text-3xs font-bold text-amber-700 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+                        <Zap className="h-2.5 w-2.5 fill-amber-600" />
+                        Activo
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Switch
+                      checked={bank.is_sponsored}
+                      onCheckedChange={checked => toggleSponsoredMutation.mutate({ id: bank.id, is_sponsored: checked })}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // ─── Dashboard Principal ───────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const router = useRouter()
@@ -595,6 +701,10 @@ export default function AdminDashboard() {
               <TabsTrigger value="upload-pdf" className="rounded-lg font-semibold text-xs cursor-pointer flex items-center gap-1">
                 <FileUp className="h-3 w-3" />
                 Cargar PDF
+              </TabsTrigger>
+              <TabsTrigger value="publicidad" className="rounded-lg font-semibold text-xs cursor-pointer flex items-center gap-1">
+                <Megaphone className="h-3 w-3" />
+                Publicidad
               </TabsTrigger>
             </TabsList>
           </div>
@@ -906,6 +1016,11 @@ export default function AdminDashboard() {
           {/* TAB 5: CARGAR PDF */}
           <TabsContent value="upload-pdf" className="animate-fade-in">
             <PdfUploadTab banks={banks} />
+          </TabsContent>
+
+          {/* TAB 6: PUBLICIDAD */}
+          <TabsContent value="publicidad" className="animate-fade-in">
+            <PublicidadTab banks={banks} />
           </TabsContent>
 
         </Tabs>

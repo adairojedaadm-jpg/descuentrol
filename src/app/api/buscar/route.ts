@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       .select(`
         id, title, description, discount_type, discount_value, discount_display,
         conditions, valid_to, days_of_week, source_type, source_url, pdf_url,
-        bank:banks!inner(id, name, logo_url),
+        bank:banks!inner(id, name, logo_url, is_sponsored),
         promotion_categories!inner(category_id),
         promotion_cards(card_id, card:cards(id, name, network))
       `)
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
 
     // 5. Mapear a tipo Promo
     const promos: Promo[] = filtered.map(p => {
-      const bank = p.bank as unknown as { id: string; name: string; logo_url?: string | null }
+      const bank = p.bank as unknown as { id: string; name: string; logo_url?: string | null; is_sponsored?: boolean }
       const allCards = (p.promotion_cards as unknown as { card_id: string; card: { id: string; name: string; network: string } }[]) ?? []
       const matchedCards = tarjetas.length > 0
         ? allCards.filter(pc => tarjetas.includes(pc.card_id)).map(pc => pc.card)
